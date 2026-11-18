@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 type ShortenerService interface {
@@ -27,21 +29,27 @@ func New(service ShortenerService, baseURL string, log *slog.Logger) *Handler {
 }
 
 func (h *Handler) InitRoutes() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /shorten", h.shorten)
-	mux.HandleFunc("GET /{code}", h.redirect)
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
 
-	return h.loggingMiddleware(mux)
+	router.Use(gin.Recovery(), h.loggingMiddleware())
+
+	router.POST("/shorten", h.shorten)
+	router.GET("/:code", h.redirect)
+
+	return router
 }
 
-func (h *Handler) loggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) loggingMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		start := time.Now()
-		next.ServeHTTP(w, r)
+		c.Next()
+
 		h.log.Info("request",
-			slog.String("method", r.Method),
-			slog.String("path", r.URL.Path),
+			slog.String("method", c.Request.Method),
+			slog.String("path", c.Request.URL.Path),
+			slog.Int("status", c.Writer.Status()),
 			slog.Duration("duration", time.Since(start)),
 		)
-	})
+	}
 }

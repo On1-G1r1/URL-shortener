@@ -1,43 +1,19 @@
 package domain
 
 import (
-	"net/http"
-
-	"github.com/gin-gonic/gin"
+	"errors"
+	"time"
 )
 
-var urlStore = make(map[string]string)
+var (
+	ErrURLNotFound = errors.New("url not found")
+	ErrURLExists   = errors.New("short code already exists")
+	ErrInvalidURL  = errors.New("invalid url format")
+)
 
-func main() {
-	r := gin.Default()
-
-	r.POST("/shorten", func(c *gin.Context) {
-		var req struct {
-			OriginalURL `json:"original_url" binding:"required"`
-		}
-		if err := c.BindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
-			return
-		}
-
-		ShortURL := GenerateShortURL(req.OriginalURL)
-		urlstore[ShortURL] = req.OriginalURL
-
-		c.JSON(http.StatusOK, gin.H{
-			"short_code": ShortURL,
-			"short_url":  "http://localhost:8080/" + ShortURL,
-		})
-
-	})
-	r.GET("/:code", func(c *gin.Context) {
-		shortCode := c.Param("shortURL")
-		originalURL, exist := urlStore[shortCode]
-		if !exist {
-			c.JSON(http.StatusNotFound, gin.H{"error": "short URL not found"})
-			return
-		}
-		c.Redirect(http.StatusFound, originalURL)
-	})
-	r.Run(":8080")
-
+type URL struct {
+	ID          int64
+	ShortCode   string
+	OriginalURL string
+	CreatedAt   time.Time
 }

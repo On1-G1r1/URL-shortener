@@ -1,39 +1,39 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
-
 	"url-shortener/internal/domain"
+
+	"github.com/gin-gonic/gin"
 )
 
 type shortenRequest struct {
-	URL string `json:"url"`
+	URL string `json:"url" binding:"required"`
 }
 
 type shortenResponse struct {
 	ShortURL string `json:"short_url"`
 }
 
-func (h *Handler) shorten(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) shorten(c *gin.Context) {
 	var req shortenRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
-	code, err := h.service.Shorten(r.Context(), req.URL)
+	code, err := h.service.Shorten(c.Request.Context(), req.URL)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidURL) {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		h.log.Error("shorten failed", slog.String("err", err.Error()))
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
@@ -41,28 +41,26 @@ func (h *Handler) shorten(w http.ResponseWriter, r *http.Request) {
 		ShortURL: fmt.Sprintf("%s/%s", strings.TrimRight(h.baseURL, "/"), code),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(resp)
+	c.JSON(http.StatusCreated, resp)
 }
 
-func (h *Handler) redirect(w http.ResponseWriter, r *http.Request) {
-	code := r.PathValue("code")
+func (h *Handler) redirect(c *gin.Context) {
+	code := c.Param("code")
 	if code == "" {
-		http.Error(w, "code is required", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "code is required"})
 		return
 	}
 
-	originalURL, err := h.service.Resolve(r.Context(), code)
+	originalURL, err := h.service.Resolve(c.Request.Context(), code)
 	if err != nil {
 		if errors.Is(err, domain.ErrURLNotFound) {
-			http.Error(w, "url not found", http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"error": "url not found"})
 			return
 		}
 		h.log.Error("resolve failed", slog.String("err", err.Error()))
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	http.Redirect(w, r, originalURL, http.StatusFound)
+	c.Redirect(http.StatusFound, originalURL)
 }
