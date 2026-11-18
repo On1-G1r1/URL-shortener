@@ -1,0 +1,10 @@
+# Бинарники и кэш
+/url-shortener
+*.exe
+*.test
+*.out
+
+
+.env
+
+.vscode/
