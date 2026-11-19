@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON // URL Shortener</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>NeonLink</h1>
+        <p>Мгновенное сокращение длинных ссылок</p>
+    </div>
+
+    <form id="shortenForm" class="input-group">
+        <input 
+            type="url" 
+            id="urlInput" 
+            placeholder="https://example.com..." 
+            required 
+            autocomplete="off"
+        >
+        <button type="submit" id="submitBtn" class="btn-submit">Сократить</button>
+    </form>
+
+    <div id="errorBox" class="error-box"></div>
+
+    <div id="resultBox" class="result-box">
+        <div class="result-label">Ваша короткая ссылка</div>
+        <div class="result-row">
+            <a id="shortLink" href="#" target="_blank" class="short-link"></a>
+            <button type="button" id="copyBtn" class="btn-copy">Копировать</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const form = document.getElementById('shortenForm');
+    const urlInput = document.getElementById('urlInput');
+    const submitBtn = document.getElementById('submitBtn');
+    const errorBox = document.getElementById('errorBox');
+    const resultBox = document.getElementById('resultBox');
+    const shortLink = document.getElementById('shortLink');
+    const copyBtn = document.getElementById('copyBtn');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const rawUrl = urlInput.value.trim();
+        if (!rawUrl) return;
+
+        errorBox.style.display = 'none';
+        resultBox.style.display = 'none';
+        copyBtn.textContent = 'Копировать';
+        copyBtn.classList.remove('copied');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Обработка...';
+
+        try {
+            const response = await fetch('/shorten', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: rawUrl })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Не удалось сократить ссылку');
+            }
+
+            shortLink.href = data.short_url;
+            shortLink.textContent = data.short_url;
+            resultBox.style.display = 'block';
+        } catch (err) {
+            errorBox.textContent = 'Ошибка: ' + err.message;
+            errorBox.style.display = 'block';
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Сократить';
+        }
+    });
+
+    copyBtn.addEventListener('click', async () => {
+        const text = shortLink.textContent;
+        if (!text) return;
+
+        try {
+            await navigator.clipboard.writeText(text);
+            copyBtn.textContent = 'Скопировано!';
+            copyBtn.classList.add('copied');
+            setTimeout(() => {
+                copyBtn.textContent = 'Копировать';
+                copyBtn.classList.remove('copied');
+            }, 2000);
+        } catch (err) {
+            alert('Не удалось скопировать текст');
+        }
+    });
+</script>
+
+</body>
+</html>

@@ -33,6 +33,8 @@ func (h *Handler) InitRoutes() http.Handler {
 	router := gin.New()
 
 	router.Use(gin.Recovery(), h.loggingMiddleware())
+	router.StaticFile("/", "./web/index.html")
+	router.Static("/static", "./web")
 
 	router.POST("/shorten", h.shorten)
 	router.GET("/:code", h.redirect)
